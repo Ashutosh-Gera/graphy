@@ -1,0 +1,25 @@
+/* static/css/styles.css */
+
+body {
+    font-family: 'Open Sans', sans-serif;
+    background-color: #f8f9fa;
+}
+
+h1, .navbar-brand {
+    font-family: 'Roboto', sans-serif;
+}
+
+.card {
+    font-family: 'Roboto', sans-serif;
+}
+
+#graph {
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    background-color: white;
+}
+
+.footer {
+    flex-shrink: 0;
+}
+

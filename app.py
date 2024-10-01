@@ -1,3 +1,4 @@
+# app.py
 from flask import Flask, render_template, request, jsonify, Response
 from graph import create_sample_graph
 from algorithms import dfs, bfs
@@ -7,6 +8,15 @@ import json
 import networkx as nx
 
 app = Flask(__name__)
+
+# Color palette
+COLORS = {
+    'unvisited_node': '#1f77b4',  # Blue
+    'visited_node': '#d62728',    # Red
+    'current_node': '#2ca02c',    # Green
+    'untraversed_edge': '#7f7f7f', # Gray
+    'traversed_edge': '#17becf'   # Cyan
+}
 
 @app.route('/')
 def home():
@@ -27,10 +37,10 @@ def run_algorithm():
         return jsonify({'error': 'Invalid algorithm'})
 
     figure = create_visualization_frames(G, steps)
-    
+
     # Serialize the figure using PlotlyJSONEncoder
     figure_json = json.dumps(figure, cls=plotly.utils.PlotlyJSONEncoder)
-    
+
     # Return the serialized figure with the correct MIME type
     return Response(figure_json, mimetype='application/json')
 
@@ -38,7 +48,7 @@ def create_visualization_frames(G, steps):
     import plotly.graph_objs as go
     import networkx as nx
 
-    pos = nx.spring_layout(G, seed=42)  # Fixed positions for consistency
+    pos = nx.spring_layout(G, seed=42, k=0.5)  # Fixed positions for consistency
     node_indices = list(G.nodes())
 
     # Prepare initial node positions
@@ -50,7 +60,7 @@ def create_visualization_frames(G, steps):
         node_y.append(y)
 
     # Initialize node colors
-    initial_node_color = ['blue'] * len(node_indices)
+    initial_node_color = [COLORS['unvisited_node']] * len(node_indices)
 
     # Prepare initial node trace
     node_trace = go.Scatter(
@@ -61,25 +71,27 @@ def create_visualization_frames(G, steps):
         textposition='top center',
         marker=dict(
             color=initial_node_color,
-            size=20,
+            size=30,
             line=dict(width=2, color='black')
         ),
-        hoverinfo='text'
+        hoverinfo='text',
+        hovertext=['Node: {}'.format(node) for node in node_indices]
     )
 
     # Prepare edge traces
-    edge_traces = []
+    initial_edge_traces = []
     for edge in G.edges():
         x0, y0 = pos[edge[0]]
         x1, y1 = pos[edge[1]]
         edge_trace = go.Scatter(
-            x=[x0, x1],
-            y=[y0, y1],
+            x=[x0, x1, None],
+            y=[y0, y1, None],
             mode='lines',
-            line=dict(width=2, color='#888'),  # Default color
-            hoverinfo='none'
+            line=dict(width=2, color=COLORS['untraversed_edge']),
+            hoverinfo='text',
+            hovertext='Edge: {}-{}'.format(edge[0], edge[1])
         )
-        edge_traces.append(edge_trace)
+        initial_edge_traces.append(edge_trace)
 
     # Create frames for each step
     frames = []
@@ -92,24 +104,25 @@ def create_visualization_frames(G, steps):
         frame_node_color = []
         for node in node_indices:
             if node == current_node:
-                frame_node_color.append('green')  # Current node
+                frame_node_color.append(COLORS['current_node'])  # Current node
             elif node in visited_nodes:
-                frame_node_color.append('red')    # Visited nodes
+                frame_node_color.append(COLORS['visited_node'])    # Visited nodes
             else:
-                frame_node_color.append('blue')   # Unvisited nodes
+                frame_node_color.append(COLORS['unvisited_node'])   # Unvisited nodes
 
         # Update edge colors
         frame_edge_traces = []
-        for i, edge in enumerate(G.edges()):
-            edge_color = 'blue'  # Default edge color
+        for edge in G.edges():
+            edge_color = COLORS['untraversed_edge']  # Default edge color
             if edge in traversed_edges or (edge[1], edge[0]) in traversed_edges:
-                edge_color = 'red'  # Traversed edge
+                edge_color = COLORS['traversed_edge']  # Traversed edge
             edge_trace = go.Scatter(
-                x=[pos[edge[0]][0], pos[edge[1]][0]],
-                y=[pos[edge[0]][1], pos[edge[1]][1]],
+                x=[pos[edge[0]][0], pos[edge[1]][0], None],
+                y=[pos[edge[0]][1], pos[edge[1]][1], None],
                 mode='lines',
                 line=dict(width=2, color=edge_color),
-                hoverinfo='none'
+                hoverinfo='text',
+                hovertext='Edge: {}-{}'.format(edge[0], edge[1])
             )
             frame_edge_traces.append(edge_trace)
 
@@ -124,17 +137,18 @@ def create_visualization_frames(G, steps):
                     textposition='top center',
                     marker=dict(
                         color=frame_node_color,
-                        size=20,
+                        size=30,
                         line=dict(width=2, color='black')
                     ),
-                    hoverinfo='text'
+                    hoverinfo='text',
+                    hovertext=['Node: {}'.format(node) for node in node_indices]
                 )
             ],
             name=f'Step{step_num}'
         )
         frames.append(frame)
 
-    # Define layout with animation settings
+    # Define layout with default animation settings
     layout = go.Layout(
         title='Graph Algorithm Visualization',
         showlegend=False,
@@ -147,9 +161,9 @@ def create_visualization_frames(G, steps):
                         'label': 'Play',
                         'method': 'animate',
                         'args': [None, {
-                            'frame': {'duration': 1000, 'redraw': True},
+                            'frame': {'duration': 500, 'redraw': True},
                             'fromcurrent': True,
-                            'transition': {'duration': 500, 'easing': 'quadratic-in-out'}
+                            'transition': {'duration': 300, 'easing': 'quadratic-in-out'}
                         }]
                     },
                     {
@@ -161,7 +175,12 @@ def create_visualization_frames(G, steps):
                             'transition': {'duration': 0}
                         }]
                     }
-                ]
+                ],
+                'showactive': False,
+                'x': 0.1,
+                'y': 0,
+                'xanchor': 'right',
+                'yanchor': 'top'
             }
         ],
         sliders=[{
@@ -169,12 +188,12 @@ def create_visualization_frames(G, steps):
             'yanchor': 'top',
             'xanchor': 'left',
             'currentvalue': {
-                'font': {'size': 20},
-                'prefix': 'Step:',
+                'font': {'size': 16, 'color': '#666'},
+                'prefix': 'Step ',
                 'visible': True,
                 'xanchor': 'right'
             },
-            'transition': {'duration': 500, 'easing': 'cubic-in-out'},
+            'transition': {'duration': 300, 'easing': 'cubic-in-out'},
             'pad': {'b': 10, 't': 50},
             'len': 0.9,
             'x': 0.1,
@@ -183,8 +202,8 @@ def create_visualization_frames(G, steps):
                 'method': 'animate',
                 'args': [
                     [f'Step{k}'],
-                    {'frame': {'duration': 1000, 'redraw': True},
-                     'transition': {'duration': 500, 'easing': 'quadratic-in-out'}}
+                    {'frame': {'duration': 500, 'redraw': True},
+                     'transition': {'duration': 300, 'easing': 'quadratic-in-out'}}
                 ],
                 'label': str(k)
             } for k in range(len(frames))]
@@ -192,19 +211,6 @@ def create_visualization_frames(G, steps):
     )
 
     # Create the figure with initial data
-    initial_edge_traces = []
-    for edge in G.edges():
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
-        edge_trace = go.Scatter(
-            x=[x0, x1],
-            y=[y0, y1],
-            mode='lines',
-            line=dict(width=2, color='#888'),  # Default color
-            hoverinfo='none'
-        )
-        initial_edge_traces.append(edge_trace)
-
     figure = go.Figure(
         data=initial_edge_traces + [node_trace],
         layout=layout,
@@ -212,8 +218,6 @@ def create_visualization_frames(G, steps):
     )
 
     return figure
-
-
 
 if __name__ == '__main__':
     app.run(debug=True)
