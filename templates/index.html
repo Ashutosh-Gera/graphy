@@ -1,0 +1,20 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Graphy</title>
+</head>
+<body>
+    <h1>Graphy: Graph Algorithm Visualizer</h1>
+    <button onclick="runAlgorithm('dfs')">Run DFS</button>
+    <button onclick="runAlgorithm('bfs')">Run BFS</button>
+    <div id="graph"></div>
+
+    <!-- Include Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+    <!-- Include external JavaScript file -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
